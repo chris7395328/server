@@ -4,10 +4,10 @@ const { getManagedCacheStorage } = require('../cache');
 
 const track = (info) => {
 	const url =
-		'https://csm.sayqz.com/api/?type=apiSongUrlV1&id=' +
+		'https://music.gdstudio.xyz/api.php?types=url&source=netease&id=' +
 		info.id +
-		'&level=' +
-		['sky', 'exhigh'].slice(
+		'&br=' +
+		['999', '320'].slice(
 			select.ENABLE_FLAC ? 0 : 1,
 			select.ENABLE_FLAC ? 1 : 2
 		);
