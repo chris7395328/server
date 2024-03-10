@@ -3,7 +3,7 @@ const crypto = require('./crypto');
 const request = require('./request');
 const match = require('./provider/match');
 const querystring = require('querystring');
-const { isHost } = require('./utilities');
+const { isHost, cookieToMap, mapToCookie } = require('./utilities');
 const { getManagedCacheStorage } = require('./cache');
 const { logScope } = require('./logger');
 
@@ -115,10 +115,10 @@ hook.request.before = (ctx) => {
 		(req.url.startsWith('http://')
 			? ''
 			: (req.socket.encrypted ? 'https:' : 'http:') +
-			  '//' +
-			  (domainList.some((domain) =>
+				'//' +
+				(domainList.some((domain) =>
 					(req.headers.host || '').endsWith(domain)
-			  )
+				)
 					? req.headers.host
 					: null)) + req.url;
 	const url = parse(req.url);
@@ -128,6 +128,19 @@ hook.request.before = (ctx) => {
 		)
 	)
 		ctx.decision = 'proxy';
+
+	if (process.env.NETEASE_COOKIE && url.path.includes('url')) {
+		var cookies = cookieToMap(req.headers.cookie);
+		var new_cookies = cookieToMap(process.env.NETEASE_COOKIE);
+
+		Object.entries(new_cookies).forEach(([key, value]) => {
+			cookies[key] = value;
+		});
+
+		req.headers.cookie = mapToCookie(cookies);
+		logger.debug('Replace netease cookie');
+	}
+
 	if (
 		[url.hostname, req.headers.host].some((host) =>
 			hook.target.host.has(host)
@@ -315,7 +328,9 @@ hook.request.after = (ctx) => {
 								LOCAL_VIP_UID.includes(info.data.userId))
 						) {
 							try {
-								const expireTime = info.data.now + 31622400000;
+								const nowTime =
+									info.data.now || new Date().getTime();
+								const expireTime = nowTime + 31622400000;
 								info.data.redVipLevel = vipLevel;
 								info.data.redVipAnnualCount = 1;
 
@@ -643,17 +658,17 @@ const tryMatch = (ctx) => {
 							? `${global.endpoint.replace(
 									'https://',
 									'http://'
-							  )}/package/${crypto.base64.encode(song.url)}/${
+								)}/package/${crypto.base64.encode(song.url)}/${
 									item.id
-							  }.${item.type}`
+								}.${item.type}`
 							: song.url;
 					} else {
 						item.url = global.endpoint
 							? `${
 									global.endpoint
-							  }/package/${crypto.base64.encode(song.url)}/${
+								}/package/${crypto.base64.encode(song.url)}/${
 									item.id
-							  }.${item.type}`
+								}.${item.type}`
 							: song.url;
 					}
 					item.md5 = song.md5 || crypto.md5.digest(song.url);
@@ -679,7 +694,7 @@ const tryMatch = (ctx) => {
 										? current.map((element) => [element])
 										: aggregation.map((element, index) =>
 												element.concat(current[index])
-										  ),
+											),
 								[]
 							)
 							.filter((pair) => pair[0] !== pair[1])[0];
@@ -737,7 +752,7 @@ const tryMatch = (ctx) => {
 					)
 						.toString()
 						.replace('_0', '')
-			  ); // reduce time cost
+				); // reduce time cost
 		tasks = jsonBody.data.map((item) => inject(item));
 	}
 	return Promise.all(tasks).catch((e) => e && logger.error(e));
